@@ -1,3 +1,3 @@
-from .pyquery import PyqueryMiddleware
+from .pyquery import PyQueryMiddleware
 
-__all__ = ["PyqueryMiddleware"]
+__all__ = ["PyQueryMiddleware"]
