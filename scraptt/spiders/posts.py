@@ -1,69 +1,131 @@
-import asyncio
-import re
+from __future__ import annotations
 
-from scrapy.http.response.html import HtmlResponse
+from typing import TYPE_CHECKING
 
-from ..items import PostItem
-from .base import BasePostSpider
-from .utils.parsers.comment import (
-    count_comments,
-    create_comments,
+from dependency_injector.wiring import inject
+from scrapy import Spider
+from scrapy.http import Request
+from scrapy.signalmanager import dispatcher
+from scrapy.utils.defer import maybe_deferred_to_future
+from scrapy.utils.reactor import is_asyncio_reactor_installed
+
+from scraptt.config import (
+    COOKIES,
+    PTT_BASE_URL,
+    PTT_DOMAINS,
 )
-from .utils.parsers.content import clean_content
-from .utils.parsers.meta import get_meta_data
+from scraptt.interfaces import (
+    Post,
+    SpiderArguments,
+)
+from scraptt.ioc import (
+    Container,
+    Provide,
+)
+from scraptt.services import (
+    LatestIndexFetchService,
+    PostCommentReactionService,
+    PostCommentService,
+    PostContentService,
+    PostLinkService,
+    PostMetadataService,
+)
+from scraptt.singals import error_post_signal
+
+if TYPE_CHECKING:
+    from scrapy.http.response.html import HtmlResponse
+    from twisted.internet.defer import DeferredList
 
 
-async def get_post_info(response: HtmlResponse):
-    handlers = (get_meta_data, count_comments, create_comments)
-    tasks = []
-    for handler in handlers:
-        task = asyncio.create_task(handler(response))
-        tasks.append(task)
-
-    return await asyncio.gather(*tasks)
-
-
-class PttSpider(BasePostSpider):
-    """
-    The PttSpider object defines the behaviour for crawling and parsing pages for the ptt website.
-    """
-
+class PttSpider(Spider):
     name = "ptt"
+    allowed_domains = PTT_DOMAINS
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._arguments = SpiderArguments(**kwargs)
+        self._container = Container()
+        self._container.wire(modules=[__name__])
+        if not is_asyncio_reactor_installed():
+            raise ValueError(
+                "PttSpider requires the asyncio Twisted "
+                "reactor. Make sure you have it configured in the "
+                "TWISTED_REACTOR setting. See the asyncio documentation "
+                "of Scrapy for more information."
+            )
 
-    # pylint: disable=arguments-differ
-    def parse(self, response: HtmlResponse):
-        main_content = response.dom("#main-content")
+    @inject
+    def start_requests(
+        self,
+        latest_index_fetch_service: LatestIndexFetchService = Provide[
+            LatestIndexFetchService
+        ],
+    ):
+        with_range = all([self._arguments.index_from, self._arguments.index_to])
+        for board in self._arguments.boards:
+            if not with_range:
+                url = f"{PTT_BASE_URL}/{board}/index.html"
+                yield Request(
+                    url,
+                    cookies=COOKIES,
+                    callback=latest_index_fetch_service.fetch(self.parse),
+                    meta={"board": board},
+                )
+            else:
+                for index in range(
+                    self._arguments.index_from, self._arguments.index_to + 1
+                ):
+                    url = f"{PTT_BASE_URL}/{board}/index{index}.html"
+                    yield Request(
+                        url, cookies=COOKIES, callback=self.parse, meta={"board": board}
+                    )
 
-        if not main_content:
-            return None
+    @inject
+    async def parse(
+        self,
+        response: HtmlResponse,
+        post_link_service: PostLinkService = Provide[PostLinkService],
+        post_content_service: PostContentService = Provide[PostContentService],
+        post_metadata_service: PostMetadataService = Provide[PostMetadataService],
+        post_comment_service: PostCommentService = Provide[PostCommentService],
+        post_comment_reaction_service: PostCommentReactionService = Provide[
+            PostCommentReactionService
+        ],
+        **kwargs,
+    ):
+        post_links = post_link_service.get(
+            response, self.crawler.engine, self._arguments.scrape_from
+        )
+        if not post_links:
+            return
 
-        body = clean_content(main_content)
+        responses, errors = await self.fetch_posts(post_links)
+        if errors:
+            dispatcher.send(
+                signal=error_post_signal, errors=errors, board=response.meta["board"]
+            )
 
-        if body is None:
-            return None
+        for resp in responses:
+            post_content = post_content_service.get(resp)
+            if not post_content:
+                return
 
-        post_url: str = response.url
-        board = re.search(r"www\.ptt\.cc\/bbs\/([\w\d\-_]{1,30})\/", post_url).group(1)
-        post_id = post_url.split("/")[-1].split(".html")[0]
-        timestamp = re.search(r"(\d{10})", response.url).group(1)
+            metadata = post_metadata_service.get(resp)
+            comments = post_comment_service.get(resp)
+            comment_reaction = post_comment_reaction_service.count(resp)
+            yield Post(
+                **metadata,
+                content=post_content,
+                comment_reaction=comment_reaction,
+                comments=comments,
+            ).model_dump()
 
-        meta_header, comment_counter, comments = asyncio.run(get_post_info(response))
-        post_title = meta_header.get("標題", "")
-        post_author = meta_header.get("作者", "匿名")
-
-        data = {
-            "board": board,
-            "post_id": post_id,
-            "date": timestamp,
-            "title": post_title,
-            "author": post_author,
-            "body": body,
-            "post_vote": comment_counter,
-            "comments": comments,
-        }
-
-        yield PostItem(**data).dict()
-        return None
+    async def fetch_posts(self, post_links: DeferredList):
+        result = await maybe_deferred_to_future(post_links)
+        responses, error = [], []
+        for success, response in result:
+            if not success or response.status != 200:
+                error.append(response)
+            else:
+                responses.append(response)
+        return responses, error
