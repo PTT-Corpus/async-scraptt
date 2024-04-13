@@ -19,7 +19,7 @@ class PyQueryMiddleware:
     """
 
     def process_response(
-        self, request: Request, response: HtmlResponse, spider: PttSpider
+        self, request: Request, response: HtmlResponse, spider: PttSpider  # noqa: F841
     ) -> HtmlResponse:
         response.dom = PyQuery(response.text).make_links_absolute(PTT_BASE_URL)
         return response
