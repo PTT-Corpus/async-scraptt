@@ -14,11 +14,11 @@ META_TAG = '//*[@id="main-content"]/div/span[@class="article-meta-tag"]'
 
 
 class PostMetadata(TypedDict):
+    id: str
     board: str
     title: str
     author: str
-    post_id: str
-    created_timestamp: int
+    created_at: int
 
 
 class PostMetadataService:
@@ -37,14 +37,14 @@ class PostMetadataService:
             r"www\.ptt\.cc\/bbs\/([\w\d\-_]{1,30})\/", response.url
         ).group(1)
         post_id = response.url.split("/")[-1].split(".html")[0]
-        created_timestamp = re.search(r"(\d{10})", response.url).group(1)
+        created_at = re.search(r"(\d{10})", response.url).group(1)
         header = self._get_metadata_header(response)
         title = header.get("標題", "無標題")
         author = header.get("作者", "匿名")
         return PostMetadata(
+            id=post_id,
             board=board,
             title=title,
             author=author,
-            post_id=post_id,
-            created_timestamp=int(created_timestamp),
+            created_at=int(created_at),
         )
