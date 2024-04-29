@@ -66,6 +66,32 @@ positional arguments:
   >Note: the comma in the argument `boards` cannot have spaces. It cannot be `boards=Soft_Job, Baseball` or  `boards=["Soft_Job", "Baseball"]`.
 
 
+### 3. Running Applications with Docker
+A Docker setup is provided for the crawler.
+
+To run the crawler, go to the `docker-compose.yml` file to edit the command:
+
+```yaml
+version: "3"
+
+services:
+  scraptt:
+    build: .
+    # define your crawler here!
+    command: bash -c "poetry run scrapy crawl ptt -a boards=Soft_Job -a index_from=1500 -a index_to=1500"
+
+    volumes:
+      - "./data:/app/data"
+
+```
+> Feel free to change the command as long as it follows the command format as stated above.
+
+Now start the crawler:
+
+```bash
+docker compose up
+```
+
 ## Contact
 If you have any suggestion or question, please do not hesitate to email us at shukai@gmail.com or
 lixingyang.dev@gmail.com
