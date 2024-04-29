@@ -29,26 +29,26 @@ This project scrapes/crawls post content and comments from [PTT](https://term.pt
 
 1. Commands
 ```
-scrapy crawl ptt -a boards=BOARDS [-a scrape_all=BOOLEAN]
+scrapy crawl ptt -a boards=BOARDS [-a fetch_all=BOOLEAN]
             [-a index_from=NUMBER -a index_to=NUMBER]
-            [-a since=YEAR] [-a data_dir=PATH]
+            [-a scrape_from=YEAR] [-a data_dir=PATH]
 
 positional arguments:
 -a boards=BOARDS                          ptt board name (e.g. Soft_Job)
 -a index_from=NUMBER -a index_to=NUMBER   html index number from a ptt board
--a scrape_all=BOOLEAN                     scrap all posts if true
--a since=YEAR                             scrap all posts from a given year
+-a fetch_all=BOOLEAN                     scrap all posts if true
+-a scrape_from=YEAR                             scrap all posts from a given year
 -a data_dir=PATH                          output file path (default: ./data)
 ```
 
 * Crawl all the posts of a board:
   ```bash
-  scrapy crawl ptt -a boards=Soft_Job -a scrape_all=True
+  scrapy crawl ptt -a boards=Soft_Job -a fetch_all=True
   ```
 
 * Crawl all the posts of a board from a year in the past:
   ```bash
-  scrapy crawl ptt -a boards=Soft_Job -a since=2022
+  scrapy crawl ptt -a boards=Soft_Job -a scrape_from=2022
   ```
 
 * Crawl the posts of a board based on html indexes:
