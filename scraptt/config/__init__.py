@@ -1,11 +1,17 @@
-from .ptt import (
+from .base import (
+    BASE_DIR,
     COOKIES,
-    PTT,
-    PTT_BOARD,
+    DATA_DIR,
+    FAILED_URLS_FILE,
+    PTT_BASE_URL,
+    PTT_DOMAINS,
 )
 
 __all__ = [
-    "PTT",
-    "PTT_BOARD",
+    "BASE_DIR",
     "COOKIES",
+    "DATA_DIR",
+    "FAILED_URLS_FILE",
+    "PTT_BASE_URL",
+    "PTT_DOMAINS",
 ]
