@@ -1,9 +1,16 @@
-FROM python:3.10-slim as base
+FROM python:3.11-slim as base
 
-ENV POETRY_VERSION=1.4.0
-ENV POETRY_HOME=/opt/poetry
-ENV POETRY_VENV=/opt/poetry-venv
-ENV POETRY_CACHE_DIR=/opt/.cache
+ENV PYTHONFAULTHANDLER=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONHASHSEED=random \
+    PIP_NO_CACHE_DIR=off \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_DEFAULT_TIMEOUT=100 \
+    POETRY_VERSION=1.7.1 \
+    POETRY_HOME=/opt/poetry \
+    POETRY_VENV=/opt/poetry-venv \
+    POETRY_NO_INTERACTION=1 \
+    POETRY_CACHE_DIR=/opt/.cache
 
 FROM base as poetry-base
 
@@ -19,10 +26,7 @@ ENV PATH="${PATH}:${POETRY_VENV}/bin"
 
 WORKDIR /app
 
-COPY poetry.lock pyproject.toml ./
-
-RUN poetry check
-
 COPY . .
 
-RUN poetry install --no-interaction --no-cache --without dev
+RUN poetry check \
+    && poetry install --no-interaction --no-cache --without dev 
