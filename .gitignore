@@ -138,3 +138,6 @@ tempCodeRunnerFile.py
 # ckip drivers
 .ckip/
 ckip_drivers.pickle
+
+*.json
+*.xml
