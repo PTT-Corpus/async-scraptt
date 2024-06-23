@@ -106,9 +106,12 @@ class PttSpider(Spider):
             )
 
         for resp in responses:
+            if resp.status != 200:
+                continue
+
             post_content = post_content_service.get(resp)
             if not post_content:
-                return
+                continue
 
             metadata = post_metadata_service.get(resp)
             comments = post_comment_service.get(resp)
@@ -120,12 +123,14 @@ class PttSpider(Spider):
                 comments=comments,
             ).model_dump()
 
-    async def fetch_posts(self, post_links: DeferredList):
+    async def fetch_posts(
+        self, post_links: DeferredList
+    ) -> tuple[list[HtmlResponse], list[HtmlResponse]]:
         result = await maybe_deferred_to_future(post_links)
-        responses, error = [], []
+        responses, errors = [], []
         for success, response in result:
             if not success or response.status != 200:
-                error.append(response)
+                errors.append(response)
             else:
                 responses.append(response)
-        return responses, error
+        return responses, errors
